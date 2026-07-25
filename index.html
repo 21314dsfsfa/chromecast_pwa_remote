@@ -90,6 +90,8 @@
             margin-top: 30px;
             font-size: 0.9rem;
             color: #888;
+            text-align: center;
+            padding: 0 10px;
         }
     </style>
 </head>
@@ -137,9 +139,11 @@
 
         function initializeCastContext() {
             const context = cast.framework.CastContext.getInstance();
+            
             context.setOptions({
                 receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
-                autoJoinPolicy: chrome.cast.AutoJoinPolicy.TAB_AND_ORIGIN_SCOPED
+                // 핵심: 새 영상을 틀지 않고 기존 재생 중인 세션에 자동 바인딩
+                autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
             });
 
             // 연결 상태 변화 감지
@@ -150,7 +154,7 @@
                     switch (event.sessionState) {
                         case cast.framework.SessionState.SESSION_STARTED:
                         case cast.framework.SessionState.SESSION_RESUMED:
-                            statusText.innerText = "크롬캐스트 연결됨";
+                            statusText.innerText = "크롬캐스트 연결됨 (제어 모드)";
                             break;
                         case cast.framework.SessionState.SESSION_ENDED:
                             statusText.innerText = "연결이 해제되었습니다.";
@@ -163,11 +167,19 @@
         function getCurrentMediaSession() {
             const context = cast.framework.CastContext.getInstance();
             const session = context.getCurrentSession();
+            
             if (!session) {
-                document.getElementById('statusText').innerText = "먼저 크롬캐스트를 연결해 주세요.";
+                document.getElementById('statusText').innerText = "상단 버튼을 눌러 재생 중인 기기를 선택해 주세요.";
                 return null;
             }
-            return session.getMediaSession();
+
+            const mediaSession = session.getMediaSession();
+            if (!mediaSession) {
+                document.getElementById('statusText').innerText = "현재 제어할 수 있는 미디어가 없습니다.";
+                return null;
+            }
+
+            return mediaSession;
         }
 
         function togglePlayPause() {
