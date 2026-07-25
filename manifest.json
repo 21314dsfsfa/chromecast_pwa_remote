@@ -1,0 +1,21 @@
+{
+  "name": "Cast Remote",
+  "short_name": "Cast리모컨",
+  "description": "간편한 크롬캐스트 10초 이동 리모컨",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/888/888849.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/888/888849.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

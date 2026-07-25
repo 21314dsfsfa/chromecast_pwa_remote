@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cast Remote</title>
+    
+    <!-- PWA 설정 파일 연결 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/888/888849.png">
+
+    <!-- Google Cast Sender SDK -->
+    <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #e0e0e0;
+        }
+        .cast-btn-wrapper {
+            margin-bottom: 40px;
+            padding: 10px;
+            background: #1e1e1e;
+            border-radius: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        google-cast-launcher {
+            width: 40px;
+            height: 40px;
+            --connected-color: #4285f4;
+            --disconnected-color: #ffffff;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            width: 100%;
+            max-width: 360px;
+        }
+        .btn {
+            background: #2a2a2a;
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            padding: 25px 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: background 0.1s, transform 0.1s;
+        }
+        .btn:active {
+            background: #3d3d3d;
+            transform: scale(0.96);
+        }
+        .btn-play {
+            background: #3b82f6;
+        }
+        .btn-play:active {
+            background: #2563eb;
+        }
+        .status {
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Cast Remote</h1>
+
+    <!-- 크롬캐스트 연결 버튼 -->
+    <div class="cast-btn-wrapper">
+        <google-cast-launcher></google-cast-launcher>
+    </div>
+
+    <!-- 리모컨 메인 컨트롤러 -->
+    <div class="controls">
+        <button class="btn" onclick="seekRelative(-10)">
+            <span>⏪</span>
+            <span>-10초</span>
+        </button>
+        <button class="btn btn-play" onclick="togglePlayPause()">
+            <span id="playIcon">⏯️</span>
+            <span>재생/정지</span>
+        </button>
+        <button class="btn" onclick="seekRelative(10)">
+            <span>⏩</span>
+            <span>+10초</span>
+        </button>
+    </div>
+
+    <div class="status" id="statusText">기기를 연결해 주세요.</div>
+
+    <script>
+        // PWA Service Worker 등록
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log('SW Registered'))
+                .catch(err => console.error('SW Register Error:', err));
+        }
+
+        // Google Cast SDK 초기화
+        window['__onGCastApiAvailable'] = function(isAvailable) {
+            if (isAvailable) {
+                initializeCastContext();
+            }
+        };
+
+        function initializeCastContext() {
+            const context = cast.framework.CastContext.getInstance();
+            context.setOptions({
+                receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+                autoJoinPolicy: chrome.cast.AutoJoinPolicy.TAB_AND_ORIGIN_SCOPED
+            });
+
+            // 연결 상태 변화 감지
+            context.addEventListener(
+                cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+                (event) => {
+                    const statusText = document.getElementById('statusText');
+                    switch (event.sessionState) {
+                        case cast.framework.SessionState.SESSION_STARTED:
+                        case cast.framework.SessionState.SESSION_RESUMED:
+                            statusText.innerText = "크롬캐스트 연결됨";
+                            break;
+                        case cast.framework.SessionState.SESSION_ENDED:
+                            statusText.innerText = "연결이 해제되었습니다.";
+                            break;
+                    }
+                }
+            );
+        }
+
+        function getCurrentMediaSession() {
+            const context = cast.framework.CastContext.getInstance();
+            const session = context.getCurrentSession();
+            if (!session) {
+                document.getElementById('statusText').innerText = "먼저 크롬캐스트를 연결해 주세요.";
+                return null;
+            }
+            return session.getMediaSession();
+        }
+
+        function togglePlayPause() {
+            const mediaSession = getCurrentMediaSession();
+            if (!mediaSession) return;
+
+            if (mediaSession.playerState === chrome.cast.media.PlayerState.PLAYING) {
+                mediaSession.pause(null, () => console.log('Paused'), console.error);
+            } else {
+                mediaSession.play(null, () => console.log('Played'), console.error);
+            }
+        }
+
+        function seekRelative(seconds) {
+            const mediaSession = getCurrentMediaSession();
+            if (!mediaSession) return;
+
+            const currentTime = mediaSession.getEstimatedTime();
+            const newTime = Math.max(0, currentTime + seconds);
+
+            const request = new chrome.cast.media.SeekRequest();
+            request.currentTime = newTime;
+
+            mediaSession.seek(request, 
+                () => console.log(`Seeked to ${newTime}s`), 
+                console.error
+            );
+        }
+    </script>
+</body>
+</html>
